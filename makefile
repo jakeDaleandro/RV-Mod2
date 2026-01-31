@@ -4,24 +4,19 @@ CFLAGS = -Wall -Wextra -O2
 LDFLAGS = -lm
 
 # Target executable
-TARGET = sobel
+TARGET = canny
 
 # Source files
-SRC = Sobel.c
+SRC = canny.c
 
-# Default target
 all: $(TARGET)
 
-# Build rule
 $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
 
-# Remove generated files
 clean:
-	-cmd /c del /q $(TARGET).exe sobelout1.pgm sobelout2.pgm sobelmag.pgm >nul 2>&1
-	# Keep this fallback for Unix-like shells
-	-rm -f $(TARGET) sobelout1.pgm sobelout2.pgm sobelmag.pgm
+	-cmd /c del /q $(TARGET).exe cannyout.pgm >nul 2>&1
+	-rm -f $(TARGET) cannyout.pgm
 
-# Convenience target: build + run (optional)
 run: $(TARGET)
-	./$(TARGET) garb34.pgm sobelmag.pgm 100
+	./$(TARGET) garb34.pgm cannyout.pgm 1.0
