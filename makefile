@@ -4,10 +4,10 @@ CFLAGS = -Wall -Wextra -O2
 LDFLAGS = -lm
 
 # Target executable
-TARGET = canny2
+TARGET = canny
 
 # Source files
-SRC = canny2.c
+SRC = canny.c
 
 all: $(TARGET)
 
