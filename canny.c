@@ -277,9 +277,6 @@ int main(int argc, char *argv[])
     int areaOfTops = 0;
     int cutoff = (percent * PICSIZE * PICSIZE * 0.01);
 
-    printf("cutoff = %d\n", cutoff);
-    printf("percent = %d%%\n", percent);
-
     /* find HI */
     for (i = PICSIZE - 1; i >= 0; i--)
     {
@@ -288,15 +285,11 @@ int main(int argc, char *argv[])
         if (areaOfTops >= cutoff)
         {
             HI = i;
-            printf("HI = %d\n", i);
             break;
         }
     }
 
-    printf("areaOfTops = %d\n", areaOfTops);
-    printf("High Threshold = %d\n", HI);
     LO = (int)(0.35 * HI);
-    printf("Low Threshold = %d\n", LO);
 
     /* --- FIRST PASS: strong / weak rejection --- */
     for (i = 0; i < PICSIZE; i++)
