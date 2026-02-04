@@ -1,5 +1,7 @@
 #include <stdio.h> /* Standard I/O (file reading/writing) */
 #include <math.h>  /* exp(), fabs() */
+#include <stdlib.h>
+#include <string.h>
 
 #define PICSIZE 256 /* Image assumed to be 256x256 grayscale */
 #define MAXMASK 100 /* Max size of convolution mask */
@@ -13,32 +15,73 @@ int pic[PICSIZE][PICSIZE];
 double outpicx[PICSIZE][PICSIZE];
 double outpicy[PICSIZE][PICSIZE];
 
-/* Final edge image (binary) */
+/* Final magnitude image (binary) */
 double ival[PICSIZE][PICSIZE];
+
+/* Final peaks image (binary) */
+double cand[PICSIZE][PICSIZE];
+
+/* Final output image (binary) */
+double final[PICSIZE][PICSIZE];
 
 /* Laplacian of Gaussian (LoG) mask */
 double xmask[MAXMASK][MAXMASK];
 double ymask[MAXMASK][MAXMASK];
 
 /* Stores convolution result for zero-crossing detection */
-double convx[PICSIZE][PICSIZE];
-double convy[PICSIZE][PICSIZE];
+double xconv[PICSIZE][PICSIZE];
+double yconv[PICSIZE][PICSIZE];
+
+int histogram[PICSIZE];
 
 /* --------------------------- MAIN --------------------------- */
 int main(int argc, char *argv[])
 {
-    int i, j, p, q, x, y, mr, centx, centy;
-    double xmaskval, ymaskval, sum, sig, maxival, minival, maxval;
+    int i, j, p, q, x, y, mr, centx, centy, HI, LO, percent;
+    double xmaskval, ymaskval, sum, sig, maxival, slope;
+    HI = 255;
 
-    FILE *fp1, *fo1;
-    char *foobar;
+    FILE *fp1, *fo1, *fo2, *fo3;
+    char *foobar, *foobar1;
 
     /* ---- Argument handling ---- */
+    // Inputs
     argc--;
     argv++;
     foobar = *argv;
     fp1 = fopen(foobar, "rb");
+    if (!fp1)
+    {
+        perror("fopen");
+        exit(1);
+    }
 
+    char header[256];
+    int width, height, maxval;
+    /* read magic number */
+    fgets(header, sizeof(header), fp1);
+    if (strncmp(header, "P5", 2) != 0)
+    {
+        printf("Unsupported format (expected P5)\n");
+        exit(1);
+    }
+
+    /* read width and height */
+    do
+    {
+        fgets(header, sizeof(header), fp1);
+    } while (header[0] == '#');
+
+    sscanf(header, "%d %d", &width, &height);
+
+    /* read maxval */
+    do
+    {
+        fgets(header, sizeof(header), fp1);
+    } while (header[0] == '#');
+
+    sscanf(header, "%d", &maxval);
+    // Outputs
     argc--;
     argv++;
     foobar = *argv;
@@ -50,7 +93,29 @@ int main(int argc, char *argv[])
     argc--;
     argv++;
     foobar = *argv;
+    fo2 = fopen(foobar, "wb");
+    fprintf(fo2, "P5\n");
+    fprintf(fo2, "%d %d\n", PICSIZE, PICSIZE);
+    fprintf(fo2, "255\n");
+
+    argc--;
+    argv++;
+    foobar = *argv;
+    fo3 = fopen(foobar, "wb");
+    fprintf(fo3, "P5\n");
+    fprintf(fo3, "%d %d\n", PICSIZE, PICSIZE);
+    fprintf(fo3, "255\n");
+
+    // Number inputs
+    argc--;
+    argv++;
+    foobar = *argv;
     sig = atof(foobar);
+
+    argc--;
+    argv++;
+    foobar1 = *argv;
+    percent = atof(foobar1);
 
     /* Mask radius = 3*sigma (common rule of thumb) */
     mr = (int)(sig * 3);
@@ -97,7 +162,7 @@ int main(int argc, char *argv[])
                 }
             }
             outpicx[i][j] = sum; /* For display */
-            convx[i][j] = sum;   /* For zero-cross detection */
+            xconv[i][j] = sum;   /* For zero-cross detection */
         }
     }
 
@@ -114,16 +179,14 @@ int main(int argc, char *argv[])
                 }
             }
             outpicy[i][j] = sum; /* For display */
-            convy[i][j] = sum;   /* For zero-cross detection */
+            yconv[i][j] = sum;   /* For zero-cross detection */
         }
     }
 
-    /* ---------------- Normalize Output ----------------
-       Scale convolution result to 0–255 for viewing
+    /* ---------------- Getting Peaks ----------------
+       use magnitude to find peaks and save in new output
     --------------------------------------------------- */
-    maxval = 0;
     maxival = 0;
-    minival = 255;
     for (i = mr; i < 256 - mr; i++)
     {
         for (j = mr; j < 256 - mr; j++)
@@ -141,9 +204,165 @@ int main(int argc, char *argv[])
         {
             /* normalize magnitude */
             ival[i][j] = (ival[i][j] / maxival) * 255.0;
+            /* canny magnitude image */
+            fprintf(fo3, "%c", (unsigned char)(ival[i][j]));
+        }
+    }
 
+    for (i = mr; i < 256 - mr; i++)
+    {
+        for (j = mr; j < 256 - mr; j++)
+        {
+
+            if ((xconv[i][j]) == 0.0)
+            {
+                xconv[i][j] = .00001;
+            }
+            slope = yconv[i][j] / xconv[i][j];
+            if ((slope <= .4142) && (slope > -.4142))
+            {
+                if ((ival[i][j] > ival[i + 1][j]) && (ival[i][j] > ival[i - 1][j]))
+                {
+                    cand[i][j] = 255;
+                }
+            }
+            else if ((slope <= 2.4142) && (slope > .4142))
+            {
+                if ((ival[i][j] > ival[i - 1][j - 1]) && (ival[i][j] > ival[i + 1][j + 1]))
+                {
+                    cand[i][j] = 255;
+                }
+            }
+            else if ((slope <= -.4142) && (slope > -2.4142))
+            {
+                if ((ival[i][j] > ival[i + 1][j - 1]) && (ival[i][j] > ival[i - 1][j + 1]))
+                {
+                    cand[i][j] = 255;
+                }
+            }
+            else
+            {
+                if ((ival[i][j] > ival[i][j + 1]) && (ival[i][j] > ival[i][j - 1]))
+                {
+                    cand[i][j] = 255;
+                }
+            }
+        }
+    }
+    for (i = 0; i < 256; i++)
+    {
+        for (j = 0; j < 256; j++)
+        {
+            /* peaks image */
+            fprintf(fo2, "%c", (unsigned char)(cand[i][j]));
+        }
+    }
+
+    /* clear histogram */
+    for (i = 0; i < PICSIZE; i++)
+    {
+        histogram[i] = 0;
+    }
+
+    /* build histogram */
+    for (i = 0; i < PICSIZE; i++)
+    {
+        for (j = 0; j < PICSIZE; j++)
+        {
+            if (ival[i][j] != 0)
+                histogram[i] += 1; // cand is 0 or 255
+        }
+    }
+
+    int areaOfTops = 0;
+    int cutoff = (percent * PICSIZE * PICSIZE * 0.01);
+
+    printf("cutoff = %d\n", cutoff);
+    printf("percent = %d%%\n", percent);
+
+    /* find HI */
+    for (i = PICSIZE - 1; i >= 0; i--)
+    {
+        areaOfTops += histogram[i];
+
+        if (areaOfTops >= cutoff)
+        {
+            HI = i;
+            printf("HI = %d\n", i);
+            break;
+        }
+    }
+
+    printf("areaOfTops = %d\n", areaOfTops);
+    printf("High Threshold = %d\n", HI);
+    LO = (int)(0.35 * HI);
+    printf("Low Threshold = %d\n", LO);
+
+    /* --- FIRST PASS: strong / weak rejection --- */
+    for (i = 0; i < PICSIZE; i++)
+    {
+        for (j = 0; j < PICSIZE; j++)
+        {
+            if (cand[i][j] != 0) // peaks == ON
+            {
+                if (ival[i][j] > HI)
+                {
+                    cand[i][j] = 0;    // peaks OFF
+                    final[i][j] = 255; // final ON
+                }
+                else if (ival[i][j] < LO)
+                {
+                    cand[i][j] = 0;  // peaks OFF
+                    final[i][j] = 0; // final OFF
+                }
+                /* else: weak peak, keep in cand for hysteresis */
+            }
+        }
+    }
+
+    /* --- HYSTERESIS LOOP --- */
+    int moretodo = 1;
+
+    while (moretodo)
+    {
+        moretodo = 0;
+
+        for (i = 0; i < PICSIZE; i++)
+        {
+            for (j = 0; j < PICSIZE; j++)
+            {
+                if (cand[i][j] != 0) // still a weak peak
+                {
+                    for (p = -1; p <= 1; p++)
+                    {
+                        for (q = -1; q <= 1; q++)
+                        {
+                            int ni = i + p;
+                            int nj = j + q;
+
+                            /* bounds check */
+                            // if (ni < 0 || ni >= PICSIZE || nj < 0 || nj >= PICSIZE)
+                            //   continue;
+
+                            if (final[ni][nj] != 0)
+                            {
+                                cand[i][j] = 0;    // peaks OFF
+                                final[i][j] = 255; // final ON
+                                moretodo = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (i = 0; i < 256; i++)
+    {
+        for (j = 0; j < 256; j++)
+        {
             /* sobel magnitude image */
-            fprintf(fo1, "%c", (unsigned char)(ival[i][j]));
+            fprintf(fo1, "%c", (unsigned char)(final[i][j]));
         }
     }
 }

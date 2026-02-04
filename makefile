@@ -15,8 +15,8 @@ $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
 
 clean:
-	-cmd /c del /q $(TARGET).exe cannyout.pgm >nul 2>&1
-	-rm -f $(TARGET) cannyout.pgm
+	-cmd /c del /q $(TARGET).exe Final_Edges.pgm peaks.pgm magnitude.pgm >nul 2>&1
+	-rm -f $(TARGET) Final_Edges.pgm peaks.pgm magnitude.pgm
 
 run: $(TARGET)
-	./$(TARGET) garb34.pgm cannyout.pgm 1.0
+	./$(TARGET) garb34.pgm Final_Edges.pgm peaks.pgm magnitude.pgm 1.0 30
