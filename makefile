@@ -19,4 +19,4 @@ clean:
 	-rm -f $(TARGET) Final_Edges.pgm peaks.pgm magnitude.pgm
 
 run: $(TARGET)
-	./$(TARGET) garb34.pgm Final_Edges.pgm peaks.pgm magnitude.pgm 1.0 30
+	./$(TARGET) garb34.pgm Final_Edges.pgm peaks.pgm magnitude.pgm 1.0 53
